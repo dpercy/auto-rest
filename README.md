@@ -25,3 +25,14 @@ Implementation ideas:
     - don't allow writing extensions in Python
   - can rewrite in something else later
 
+## Permissions
+
+You need to store info about users and permissions somewhere.
+This is kind of a circular problem, because you don't want to store them
+somewhere a user could modify and escalate their privileges.
+I don't want to reserve the "users" collection, because the application
+might want to store data in there (like a profile, or settings).
+I think I should adopt some naming convention to distinguish "data"
+from "metadata": similar to MongoDB's `system.*` collections.
+I'll use a `meta.*` prefix, and maybe disallow user collections from
+containing a dot.
