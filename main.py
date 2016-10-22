@@ -19,7 +19,13 @@ def json_response(data, **kwargs):
 @app.route('/')
 def database_summary():
     return json_response({
-        'collections': db.collection_names(),
+        'collections': [
+            { 'name': colname,
+              'url': url_for('.collection_view',
+                             collection=colname,
+                             _external=True) }
+            for colname in db.collection_names()
+        ]
     })
 
 @app.route('/<collection>', methods=['GET', 'POST'])
@@ -27,8 +33,8 @@ def collection_view(collection):
     if request.method == 'GET':
         return json_response({
             'count': db[collection].count(),
-            # TODO pagination!! or just don't list anything.
-            'items': list(db[collection].find()),
+            # TODO smarter pagination??
+            'items': list(db[collection].find().limit(100)),
         })
     elif request.method == 'POST':
         data = request.get_json(force=True)
