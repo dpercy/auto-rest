@@ -1,51 +1,16 @@
 import json
 
-from werkzeug.routing import BaseConverter
-
 import pymongo
-from bson import ObjectId, json_util
 from flask import Flask, Response, redirect, request, url_for
+from flask_util import install_helpers, json_response, try_url_for
+from mongo_util import subst_query
 
 app = Flask(__name__)
+
+install_helpers(app)
 conn = pymongo.MongoClient('mongodb://localhost:27017/blog')
 db = conn.get_default_database()
 config = json.load(open('example/config.json'))
-
-def json_response(data, **kwargs):
-    return Response(
-        json.dumps(data, default=json_util.default),
-        mimetype='application/json',
-        **kwargs)
-
-class ObjectIdConverter(BaseConverter):
-    def to_python(self, value):
-        return ObjectId(value)
-    def to_url(self, value):
-        assert isinstance(value, ObjectId)
-        return str(value)
-app.url_map.converters['oid'] = ObjectIdConverter
-
-
-def assert_valid_collection_name(value):
-    if '.' in value:
-        raise ValueError("collection name contains a dot: {}".format(value))
-
-def is_valid_collection_name(value):
-    try:
-        assert_valid_collection_name(value)
-    except ValueError:
-        return False
-    else:
-        return True
-
-class CollectionNameConverter(BaseConverter):
-    def to_python(self, value):
-        assert_valid_collection_name(value)
-        return value
-    def to_url(self, value):
-        assert_valid_collection_name(value)
-        return value
-app.url_map.converters['collection'] = CollectionNameConverter
 
 
 @app.before_request
@@ -66,11 +31,15 @@ def my_basic_auth_middleware():
             request.user = user
         else:
             request.user = nobody
+
+
 @app.route('/login')
 def hack_login():
     """ hack to get browsers to respect basic auth """
     if request.user['_id'] is None:
-        return Response("please log in", 401, {'WWW-Authenticate':'Basic realm="Login Required"'})
+        return Response("please log in", 401, {
+            'WWW-Authenticate': 'Basic realm="Login Required"',
+        })
     return redirect(url_for('.meta_whoami'))
 
 
@@ -78,12 +47,15 @@ def hack_login():
 def database_summary():
     return json_response({
         'collections': [
-            { 'name': colname,
-              'url': url_for('.collection_view',
-                             collection=colname,
-                             _external=True) }
+            {
+                'name': colname,
+                'url': url,
+            }
             for colname in db.collection_names()
-            if is_valid_collection_name(colname)
+            for url in [try_url_for('.collection_view',
+                                    collection=colname,
+                                    _external=True)]
+            if url is not None
         ]
     })
 
@@ -98,18 +70,17 @@ def meta_whoami():
 
 @app.route('/<collection:collection>', methods=['GET', 'POST'])
 def collection_view(collection):
-    query = {}
+    permission_filter = []
     if collection in config['permissions']:
-        query = { '$and': [
-            query,
-            parse_query(config['permissions'][collection],
+        q = subst_query(config['permissions'][collection],
                         user_id=request.user['_id'])
-        ] }
-    print 'query', query
+        permission_filter = permission_filter + (q if isinstance(q, list) else [q])
     if request.method == 'GET':
+        page_size = 100
+        result = list(db[collection].aggregate(permission_filter + [{'$limit': page_size + 1}]))
         return json_response({
-            'count': db[collection].count(query),
-            'items': list(db[collection].find(query).limit(100)),
+            'items': result[:page_size],
+            'hasMore': len(result) > page_size,
         })
     elif request.method == 'POST':
         # TODO the permissions filter should also apply to the insert!

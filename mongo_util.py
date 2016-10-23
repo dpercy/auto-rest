@@ -1,5 +1,3 @@
-
-
 def subst_query(query, **subst_vars):
     if isinstance(query, basestring):
         if query and query[0] == '$' and query[1:] in subst_vars:
