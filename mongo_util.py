@@ -16,7 +16,7 @@ def subst_query(query, **subst_vars):
         return query
 
 
-def test_subst_query():
+def _test_subst_query():
     assert subst_query("$user_id", user_id=123) == 123
     assert subst_query("$foo", user_id=123) == "$foo"
     assert subst_query("", user_id=123) == ""
