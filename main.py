@@ -5,7 +5,6 @@ from werkzeug.routing import BaseConverter
 import pymongo
 from bson import ObjectId, json_util
 from flask import Flask, Response, redirect, request, url_for
-from flask.views import MethodView
 
 app = Flask(__name__)
 conn = pymongo.MongoClient('mongodb://localhost:27017/blog')
@@ -106,13 +105,17 @@ def collection_view(collection):
             parse_query(config['permissions'][collection],
                         user_id=request.user['_id'])
         ] }
+    print 'query', query
     if request.method == 'GET':
         return json_response({
-            'count': db[collection].count(),
-            # TODO smarter pagination??
-            'items': list(db[collection].find().limit(100)),
+            'count': db[collection].count(query),
+            'items': list(db[collection].find(query).limit(100)),
         })
     elif request.method == 'POST':
+        # TODO the permissions filter should also apply to the insert!
+        # - you shouldn't be able to insert a document that you can't view
+        # - failure to insert a document should not give you clues about the
+        #   existence of other documents.
         data = request.get_json(force=True)
         result = db[collection].insert_one(data)
         new_url = url_for('.document_view',
@@ -125,6 +128,7 @@ def collection_view(collection):
         )
     else:
         assert False
+
 
 @app.route('/<collection:collection>/<oid:id>', methods=['GET', 'PUT'])
 def document_view(collection, id):

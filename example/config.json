@@ -1,6 +1,5 @@
-
 {
-"permissions": {
-  "posts": { "author_id": {"$eq": "$user_id"}
+    "permissions": {
+        "posts": { "$match": { "author_id": {"$eq": "$user_id"} } }
+    }
 }
-}}
