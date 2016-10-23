@@ -13,6 +13,11 @@ db = conn.get_default_database()
 config = json.load(open('example/config.json'))
 
 
+@app.route('/favicon.ico')
+def no_favicon():
+    return Response("go away", 404)
+
+
 @app.before_request
 def my_basic_auth_middleware():
     """ Super insecure HTTP basic auth!!! """
@@ -22,6 +27,7 @@ def my_basic_auth_middleware():
         'username': None,
         'password': None,
     }
+    print 'auth', auth
     if not auth:
         request.user = nobody
     else:
@@ -30,7 +36,9 @@ def my_basic_auth_middleware():
         if user is not None:
             request.user = user
         else:
-            request.user = nobody
+            return Response("login failed", 401, {
+                'WWW-Authenticate': 'Basic realm="Login Required"',
+            })
 
 
 @app.route('/login')
@@ -74,10 +82,13 @@ def collection_view(collection):
     if collection in config['permissions']:
         q = subst_query(config['permissions'][collection],
                         user_id=request.user['_id'])
-        permission_filter = permission_filter + (q if isinstance(q, list) else [q])
+        if not isinstance(q, list):
+            q = [q]
+        permission_filter = permission_filter + q
     if request.method == 'GET':
         page_size = 100
-        result = list(db[collection].aggregate(permission_filter + [{'$limit': page_size + 1}]))
+        result = list(db[collection].aggregate(
+            permission_filter + [{'$limit': page_size + 1}]))
         return json_response({
             'items': result[:page_size],
             'hasMore': len(result) > page_size,
