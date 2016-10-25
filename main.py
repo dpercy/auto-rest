@@ -1,7 +1,7 @@
 import json
 
 import pymongo
-from flask import Flask, Response, redirect, request, url_for
+from flask import Flask, Response, abort, redirect, request, url_for
 from flask_util import install_helpers, json_response, try_url_for
 from mongo_util import subst_query
 
@@ -22,23 +22,31 @@ def no_favicon():
 def my_basic_auth_middleware():
     """ Super insecure HTTP basic auth!!! """
     auth = request.authorization
-    nobody = {
-        '_id': None,
-        'username': None,
-        'password': None,
-    }
-    print 'auth', auth
     if not auth:
-        request.user = nobody
+        # Omitting auth is perfectly ok.
+        # Individual collections may require auth or not,
+        # depending on their permissions filters.
+        request.user = {
+            '_id': None,
+            'username': None,
+            'password': None,
+        }
     else:
         user = db['meta.users'].find_one({ 'username': auth.username,
                                            'password': auth.password })
-        if user is not None:
-            request.user = user
+        if user is None:
+            # Incorrect auth must result in an error;
+            # Silently leaving you anonymous would be much more confusing.
+            abort(401)
         else:
-            return Response("login failed", 401, {
-                'WWW-Authenticate': 'Basic realm="Login Required"',
-            })
+            request.user = user
+
+
+@app.errorhandler(401)
+def basic_auth_error_handler(e):
+    return Response("", 401, {
+        'WWW-Authenticate': 'Basic realm="Login Required"',
+    })
 
 
 @app.route('/login')
@@ -76,19 +84,24 @@ def meta_whoami():
     })
 
 
+def get_permission_filter(collection):
+    if collection not in config['permissions']:
+        return []
+
+    if request.user['_id'] is None:
+        abort(401)
+
+    query = subst_query(config['permissions'][collection],
+                        user_id=request.user['_id'])
+    return query if isinstance(query, list) else [query]
+
+
 @app.route('/<collection:collection>', methods=['GET', 'POST'])
 def collection_view(collection):
-    permission_filter = []
-    if collection in config['permissions']:
-        q = subst_query(config['permissions'][collection],
-                        user_id=request.user['_id'])
-        if not isinstance(q, list):
-            q = [q]
-        permission_filter = permission_filter + q
     if request.method == 'GET':
         page_size = 100
         result = list(db[collection].aggregate(
-            permission_filter + [{'$limit': page_size + 1}]))
+            get_permission_filter(collection) + [{'$limit': page_size + 1}]))
         return json_response({
             'items': result[:page_size],
             'hasMore': len(result) > page_size,
@@ -115,6 +128,7 @@ def collection_view(collection):
 @app.route('/<collection:collection>/<oid:id>', methods=['GET', 'PUT'])
 def document_view(collection, id):
     if request.method == 'GET':
+        # TODO apply the permissions filter!
         return json_response(db[collection].find_one({'_id': id}))
     elif request.method == 'PUT':
         # http://www.restapitutorial.com/lessons/httpmethods.html
