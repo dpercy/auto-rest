@@ -172,3 +172,5 @@ def document_view(collection, id):
             assert False, "upsert failed? how?"
     else:
         assert False
+
+# TODO write some end-to-end tests
