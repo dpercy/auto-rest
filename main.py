@@ -142,6 +142,27 @@ def document_view(collection, id):
         # http://www.restapitutorial.com/lessons/httpmethods.html
         # return 201 if created
         # return full resource representation? redundant?
-        assert False, "TODO"
+        data = get_bson(request)
+        if '_id' in data and data['_id'] != id:
+            print 'id mismatch', type(data['_id']), data['_id'], type(id), id
+            abort(400)
+        data['_id'] = id
+        if not document_matches_filter(data,
+                                       get_permission_filter(collection),
+                                       db=db):
+            abort(403)
+        result = db[collection].replace_one({'_id': id}, data, upsert=True)
+        new_url = url_for('.document_view',
+                          collection=collection,
+                          id=id)
+        if result.upserted_id is not None:
+            # 201 created
+            return Response("", 201, headers={'Location': new_url})
+        elif result.modified_count > 0:
+            # 204 no content (means it was modified successfully)
+            return Response("", 204, headers={'Location': new_url})
+        else:
+            # error?
+            assert False, "upsert failed? how?"
     else:
         assert False
