@@ -2,8 +2,8 @@ import json
 
 import pymongo
 from flask import Flask, Response, abort, redirect, request, url_for
-from flask_util import install_helpers, json_response, try_url_for
-from mongo_util import subst_query
+from flask_util import get_bson, install_helpers, json_response, try_url_for
+from mongo_util import document_matches_filter, subst_query
 
 app = Flask(__name__)
 
@@ -107,11 +107,15 @@ def collection_view(collection):
             'hasMore': len(result) > page_size,
         })
     elif request.method == 'POST':
-        # TODO the permissions filter should also apply to the insert!
+        # The permissions filter should also apply to the insert!
         # - you shouldn't be able to insert a document that you can't view
         # - failure to insert a document should not give you clues about the
         #   existence of other documents.
-        data = request.get_json(force=True)
+        data = get_bson(request)
+        if not document_matches_filter(data,
+                                       get_permission_filter(collection),
+                                       db=db):
+            abort(403)
         result = db[collection].insert_one(data)
         new_url = url_for('.document_view',
                           collection=collection,
@@ -128,8 +132,12 @@ def collection_view(collection):
 @app.route('/<collection:collection>/<oid:id>', methods=['GET', 'PUT'])
 def document_view(collection, id):
     if request.method == 'GET':
-        # TODO apply the permissions filter!
-        return json_response(db[collection].find_one({'_id': id}))
+        result = list(db[collection].aggregate(
+            get_permission_filter(collection) + [{'$match': {'_id': id}},
+                                                 {'$limit': 1}]))
+        if len(result) == 0:
+            abort(404)
+        return json_response(result[0])
     elif request.method == 'PUT':
         # http://www.restapitutorial.com/lessons/httpmethods.html
         # return 201 if created

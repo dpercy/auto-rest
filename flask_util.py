@@ -13,6 +13,14 @@ def json_response(data, **kwargs):
         **kwargs)
 
 
+def get_bson(request):
+    data = request.get_json(force=True)
+    # Convert "$oid" to ObjectId, etc
+    data = json.loads(json.dumps(data),
+                      object_hook=json_util.object_hook)
+    return data
+
+
 class ObjectIdConverter(BaseConverter):
     def to_python(self, value):
         return ObjectId(value)
