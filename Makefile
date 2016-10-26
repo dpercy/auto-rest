@@ -1,6 +1,13 @@
 
 default: todos lint test
 
+run: venv/bin/activate
+	. venv/bin/activate && \
+	WERKZEUG_DEBUG_PIN=off \
+	FLASK_DEBUG=1 \
+	FLASK_APP=main.py \
+	flask run
+
 lint: venv/bin/activate
 	. venv/bin/activate && flake8
 
