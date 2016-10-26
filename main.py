@@ -139,9 +139,6 @@ def document_view(collection, id):
             abort(404)
         return json_response(result[0])
     elif request.method == 'PUT':
-        # http://www.restapitutorial.com/lessons/httpmethods.html
-        # return 201 if created
-        # return full resource representation? redundant?
         data = get_bson(request)
         if '_id' in data and data['_id'] != id:
             print 'id mismatch', type(data['_id']), data['_id'], type(id), id
