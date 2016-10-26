@@ -3,13 +3,16 @@ import os
 
 import pymongo
 from flask import Flask, Response, abort, redirect, request, url_for
+from flask_cors import CORS
 from flask_util import get_bson, install_helpers, json_response, try_url_for
 from mongo_util import document_matches_filter, subst_query
 
 app = Flask(__name__)
+CORS(app) # TODO security! config file?
 
 install_helpers(app)
-conn = pymongo.MongoClient('mongodb://localhost:27017/blog')  # TODO factor out this URI
+# TODO factor out this URI
+conn = pymongo.MongoClient('mongodb://localhost:27017/blog')
 db = conn.get_default_database()
 config_file = os.environ.get('AUTOREST_CONFIG_FILE')
 if config_file:
@@ -138,7 +141,7 @@ def collection_view(collection):
         assert False
 
 
-@app.route('/<collection:collection>/<oid:id>', methods=['GET', 'PUT'])
+@app.route('/<collection:collection>/<oid:id>', methods=['GET', 'PUT', 'DELETE'])
 def document_view(collection, id):
     if request.method == 'GET':
         result = list(db[collection].aggregate(
@@ -147,7 +150,13 @@ def document_view(collection, id):
         if len(result) == 0:
             abort(404)
         return json_response(result[0])
+    elif request.method == 'DELETE':
+        # TODO permissions on DELETE
+        db[collection].delete_one({'_id': id})
+        return Response('', 204)
     elif request.method == 'PUT':
+        # TODO This doesn't check the before state.
+        #      Need to make sure a user can't change a doc's visibliliyt with a PUT.
         data = get_bson(request)
         if '_id' in data and data['_id'] != id:
             print 'id mismatch', type(data['_id']), data['_id'], type(id), id
