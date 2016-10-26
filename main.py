@@ -1,4 +1,5 @@
 import json
+import os
 
 import pymongo
 from flask import Flask, Response, abort, redirect, request, url_for
@@ -10,7 +11,14 @@ app = Flask(__name__)
 install_helpers(app)
 conn = pymongo.MongoClient('mongodb://localhost:27017/blog')
 db = conn.get_default_database()
-config = json.load(open('example/config.json'))
+config_file = os.environ.get('AUTOREST_CONFIG_FILE')
+if config_file:
+    with open(config_file) as f:
+        config = json.load(f)
+else:
+    config = {
+        'permissions': {}
+    }
 
 
 @app.route('/favicon.ico')
@@ -37,6 +45,7 @@ def my_basic_auth_middleware():
         if user is None:
             # Incorrect auth must result in an error;
             # Silently leaving you anonymous would be much more confusing.
+            # TODO decide on JSON-based error pages
             abort(401)
         else:
             request.user = user
