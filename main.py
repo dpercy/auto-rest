@@ -9,7 +9,7 @@ from mongo_util import document_matches_filter, subst_query
 app = Flask(__name__)
 
 install_helpers(app)
-conn = pymongo.MongoClient('mongodb://localhost:27017/blog')
+conn = pymongo.MongoClient('mongodb://localhost:27017/blog')  # TODO factor out this URI
 db = conn.get_default_database()
 config_file = os.environ.get('AUTOREST_CONFIG_FILE')
 if config_file:
