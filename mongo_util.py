@@ -31,18 +31,17 @@ def document_matches_filter(data, agg_filter, db):
     Checks whether the agg_filter produces any documents when given
     the data as input. Returns True or False.
     """
-    # Any collection known to be nonempty will work.
-    # Use meta.users because that has to be nonempty anyway,
-    # for permissions to work.
-    pipeline = (
+    # Ensure that db.meta.one collection exists and is nonempty.
+    # We need a nonempty collection to kick off the aggregation query.
+    db['meta.one'].replace_one({'_id': 1}, {'_id': 1}, upsert=True)
+    results = list(db['meta.one'].aggregate(
         # Start the pipeline with a single document: `data`
         [{'$limit': 1}, _document_as_projection(data)]
         # Send it through the filter
         + agg_filter
         # Minimize the output from the DB by returning 0 or 1 results,
         # with no fields.
-        + [{'$limit': 1}, {'$project': {'_id': 0}}])
-    results = list(db['meta.users'].aggregate(pipeline))
+        + [{'$limit': 1}, {'$project': {'_id': 0}}]))
     return len(results) > 0
 
 
@@ -58,9 +57,7 @@ def _document_as_projection(data):
     }
 
 
-def _test_document_matches_filter():
-    # TODO use fixture instead of backwards import
-    from main import db
+def _test_document_matches_filter(db):
     assert document_matches_filter({'x': 1},
                                    [{'$match': {'x': {'$gt': 0}}}],
                                    db=db)

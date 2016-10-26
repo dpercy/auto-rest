@@ -1,11 +1,15 @@
 
-default: lint test todos
+default: todos lint test
 
-lint:
-	flake8
+lint: venv/bin/activate
+	. venv/bin/activate && flake8
 
-test:
-	py.test
+test: venv/bin/activate
+	. venv/bin/activate && py.test
 
 todos:
-	rg -n '[T]ODO' | cat
+	@rg -n '[T]ODO' | cat
+
+venv/bin/activate: requirements.txt
+	virtualenv --no-site-packages venv
+	. venv/bin/activate && pip install -r requirements.txt
