@@ -8,7 +8,7 @@ from flask import Response, url_for
 
 def json_response(data, **kwargs):
     return Response(
-        json.dumps(data, default=json_util.default),
+        json.dumps(data, default=json_util.default, indent=2) + '\n',
         mimetype='application/json',
         **kwargs)
 
