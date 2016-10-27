@@ -2,6 +2,7 @@ import json
 import os
 
 import pymongo
+from bson import ObjectId
 from flask import Flask, Response, abort, redirect, request, url_for
 from flask_cors import CORS
 from flask_util import get_bson, install_helpers, json_response, try_url_for
@@ -108,6 +109,21 @@ def get_permission_filter(collection):
     return query if isinstance(query, list) else [query]
 
 
+def _id_to_link(collection, doc):
+    """
+    Takes a collection name and a document,
+    and converts the _id field into a link.
+
+    Note this both mutates doc in place, and returns it.
+    """
+    if '_id' in doc and isinstance(doc['_id'], ObjectId):
+        doc['_id'] = url_for('.document_view',
+                             collection=collection,
+                             id=doc['_id'],
+                             _external=True)
+    return doc
+
+
 @app.route('/<collection:collection>', methods=['GET', 'POST'])
 def collection_view(collection):
     if request.method == 'GET':
@@ -115,7 +131,8 @@ def collection_view(collection):
         result = list(db[collection].aggregate(
             get_permission_filter(collection) + [{'$limit': page_size + 1}]))
         return json_response({
-            'items': result[:page_size],
+            'items': [_id_to_link(collection, doc)
+                      for doc in result[:page_size]],
             'hasMore': len(result) > page_size,
         })
     elif request.method == 'POST':
@@ -124,6 +141,8 @@ def collection_view(collection):
         # - failure to insert a document should not give you clues about the
         #   existence of other documents.
         data = get_bson(request)
+        if '_id' in data:
+            abort(400, "Client should not specify the _id")
         if not document_matches_filter(data,
                                        get_permission_filter(collection),
                                        db=db):
@@ -149,7 +168,7 @@ def document_view(collection, id):
                                                  {'$limit': 1}]))
         if len(result) == 0:
             abort(404)
-        return json_response(result[0])
+        return json_response(_id_to_link(collection, result[0]))
     elif request.method == 'DELETE':
         # TODO permissions on DELETE
         db[collection].delete_one({'_id': id})
@@ -158,9 +177,11 @@ def document_view(collection, id):
         # TODO This doesn't check the before state.
         #      Need to make sure a user can't change a doc's visibliliyt with a PUT.
         data = get_bson(request)
-        if '_id' in data and data['_id'] != id:
-            print 'id mismatch', type(data['_id']), data['_id'], type(id), id
-            abort(400)
+        # If the client specified an _id URL, make sure it
+        # matches the request URL.
+        if '_id' in data and data['_id'] != request.url:
+            abort(400, "_id field did not match the resource URL")
+        # Fix the _id field for use in MongoDB.
         data['_id'] = id
         if not document_matches_filter(data,
                                        get_permission_filter(collection),
