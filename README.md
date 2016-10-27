@@ -3,14 +3,17 @@
 Goal:
 - write web (and mobile?) apps without writing a back-end
 - REST
-- easy defaults
-- support users and permissions
-  - "users can't edit each others' posts"
-  - "newPost.authorId === currentUser.id"
-  - "users can't detect the existence of each others' private messages"
-- support schema validation
-  - "bad request: got an unexpected parameter"
-  - "bad request: expected a string but got an object"
+- easy defaults - like MongoDB
+  - everything works just by running the executable - no params, no config file
+  - endpoints are created when you POST to them
+- later you can add schema / permissions / config:
+  - support users and permissions
+    - "users can't edit each others' posts"
+    - "newPost.authorId === currentUser.id"
+    - "users can't detect the existence of each others' private messages"
+  - support schema validation
+    - "bad request: got an unexpected parameter"
+    - "bad request: expected a string but got an object"
 
 
 By default, the client can CRUD anything from any collection!

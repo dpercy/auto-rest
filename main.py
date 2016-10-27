@@ -11,8 +11,8 @@ app = Flask(__name__)
 CORS(app) # TODO security! config file?
 
 install_helpers(app)
-# TODO factor out this URI
-conn = pymongo.MongoClient('mongodb://localhost:27017/blog')
+# TODO make this uri configurable
+conn = pymongo.MongoClient('mongodb://localhost:27017/autoRest')
 db = conn.get_default_database()
 config_file = os.environ.get('AUTOREST_CONFIG_FILE')
 if config_file:
